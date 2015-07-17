@@ -12,6 +12,7 @@ cmd:option('-vocabSize', 100005,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
+cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 
 local params = cmd:parse(arg)
 
@@ -104,66 +105,75 @@ toCuda(criterion)
 toCuda(net)
 
 
-----Do the optimization. All relevant tensors should be on the GPU. (if using cuda)
-local parameters, gradParameters = net:getParameters()
-
-for epoch = 1, numEpochs
-do
-    local startTime = sys.clock()
-    print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
-    -- TODO wtf is wrong with the end of this
-    for i = 1, numBatches - 100
+local function evaluate()
+    --- Evaluate ---
+    print ('Evaluating')
+    local test = torch.load(test_file)
+    local tp = 0
+    local fp = 0
+    local tn = 0
+    local fn = 0
+    for i = 1, test.labels:size()[1]
     do
-        local idx = (i % numBatches) + 1
-        local sentences = dataBatches[idx]
-        local labels = labelsBatches[idx]
-        local batch_error = 0
-        local function fEval(x)
-            if parameters ~= x then parameters:copy(x) end
-            net:zeroGradParameters()
-            local output = net:forward(sentences)
-            local err = criterion:forward(output,labels)
-            local df_do = criterion:backward(output, labels)
-            net:backward(sentences, df_do)
-            batch_error = batch_error+err
-            return err, gradParameters
+        local sample = toCuda(test.data:narrow(1, i, 1))
+        local label = test.labels:narrow(1, i, 1)[1]
+        local pred = net:forward(sample)
+        local max_prob = -math.huge
+        local max_index = -math.huge
+        for j = 1, numClasses
+        do
+            if pred[1][j] > max_prob then
+                max_prob = pred[1][j]
+                max_index = j
+            end
         end
+        if label == 1 and max_index == label then tn = tn + 1 end
+        if label == 1 and max_index ~= label then fp = fp + 1 end
+        if label ~= 1 and max_index == label then tp = tp + 1 end
+        if label ~= 1 and max_index == 1 then fn = fn + 1 end
+    end
 
-        optimMethod(fEval, parameters, optConfig, optState)
-        if(i % 500 == 0) then
-            print(string.format('%f percent complete \t speed = %f examples/sec \t last batch error = %f',
-                i/(numEpochs * numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
+    local precision = tp / (tp + fp)
+    local recall = tp / (tp + fn)
+    local f1 = 2 * ((precision * recall) / (precision + recall))
+    print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
+
+end
+
+local function train()
+    ----Do the optimization. All relevant tensors should be on the GPU. (if using cuda)
+    local parameters, gradParameters = net:getParameters()
+
+    for epoch = 1, numEpochs
+    do
+        local startTime = sys.clock()
+        print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
+        -- TODO wtf is wrong with the end of this
+        for i = 1, numBatches - 100
+        do
+            local idx = (i % numBatches) + 1
+            local sentences = dataBatches[idx]
+            local labels = labelsBatches[idx]
+            local batch_error = 0
+            local function fEval(x)
+                if parameters ~= x then parameters:copy(x) end
+                net:zeroGradParameters()
+                local output = net:forward(sentences)
+                local err = criterion:forward(output,labels)
+                local df_do = criterion:backward(output, labels)
+                net:backward(sentences, df_do)
+                batch_error = batch_error+err
+                return err, gradParameters
+            end
+
+            optimMethod(fEval, parameters, optConfig, optState)
+            if(i % 500 == 0) then
+                print(string.format('%f percent complete \t speed = %f examples/sec \t last batch error = %f',
+                    i/(numEpochs * numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
+            end
         end
+        if (epoch % params.evaluateFrequency == 0) then evaluate() end
     end
 end
 
---- Evaluate ---
-local test = torch.load(test_file)
-local tp = 0
-local fp = 0
-local tn = 0
-local fn = 0
-for i = 1, test.labels:size()[1]
-do
-    local sample = toCuda(test.data:narrow(1, i, 1))
-    local label = test.labels:narrow(1, i, 1)[1]
-    local pred = net:forward(sample)
-    local max_prob = -math.huge
-    local max_index = -math.huge
-    for j = 1, numClasses
-    do
-        if pred[1][j] > max_prob then
-            max_prob = pred[1][j]
-            max_index = j
-        end
-    end
-    if label == 1 and max_index == label then tn = tn + 1 end
-    if label == 1 and max_index ~= label then fp = fp + 1 end
-    if label ~= 1 and max_index == label then tp = tp + 1 end
-    if label ~= 1 and max_index == 1 then fn = fn + 1 end
-end
-
-local precision = tp / (tp + fp)
-local recall = tp / (tp + fn)
-local f1 = 2 * ((precision * recall) / (precision + recall))
-print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
+train()
