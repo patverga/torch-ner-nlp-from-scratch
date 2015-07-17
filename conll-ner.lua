@@ -1,11 +1,27 @@
 require 'torch'
-require 'nn'
 require 'optim'
 
-local useCuda = false
+cmd = torch.CmdLine()
+cmd:option('-train', 'train','torch format train file list')
+cmd:option('-test', 'testa','torch format test file list')
+cmd:option('-minibatch', 32,'minibatch size')
+cmd:option('-cuda', 0,'whether to use gpu')
+cmd:option('-labelDim', 8,'label dimension')
+cmd:option('-embeddingDim', 64,'embedding dimension')
+cmd:option('-vocabSize', 100000,'vocabulary size')
+cmd:option('-sentenceLength', 5,'length of input sequences')
+cmd:option('-learningRate', 0.01,'init learning rate')
+cmd:option('-numEpochs', 5, 'number of epochs to train for')
+
+local params = cmd:parse(arg)
+
+if params.cuda == 1 then local useCuda = true else local useCuda = false end
 if(useCuda) then
     require 'cunn'
     print('using GPU')
+else
+    require 'nn'
+    print ('using CPU')
 end
 local function toCuda(x)
     local y = x
@@ -16,29 +32,29 @@ local function toCuda(x)
 end
 
 --- data parameters
-local train_file = 'train'
-local test_file = 'testa'
-local sentenceLength = 5
-local vocabSize = 100000
+local train_file = params.train
+local test_file = params.test
+local sentenceLength = params.sentenceLength
+local vocabSize = params.vocabSize
 local train = torch.load(train_file)
 
 --- model parameters
-local embeddingDim = 64
+local embeddingDim = params.embeddingDim
 local hiddenUnits = 300
-local minibatchSize = 64
-local numClasses = 8
+local minibatchSize = params.minibatch
+local numClasses = params.labelDim
 local concatDim = embeddingDim * sentenceLength
 
 --- optimization parameters
 local optConfig = {
-    learningRate = 0.01,
+    learningRate = params.learningRate,
 --    learningRateDecay = params.learningRateDecay,
 --    momentum = useMomentum,
 --    dampening = dampening,
 }
 local optState = {}
 local optimMethod = optim.sgd
-local numEpochs = 5
+local numEpochs = params.numEpochs
 local numBatches = math.floor(train.data:size()[1]/minibatchSize)
 
 
@@ -94,7 +110,7 @@ local startTime = sys.clock()
 
 for epoch = 1, numEpochs
 do
-    print('Starting epoch ' .. epoch)
+    print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
     -- TODO wtf is wrong with the end of this
     for i = 1, numBatches - 100
     do
@@ -116,7 +132,7 @@ do
         optimMethod(fEval, parameters, optConfig, optState)
         if(i % 50 == 0) then
             print(string.format('%f percent complete \t speed = %f examples/sec \t error = %f',
-                i/numBatches, (i*minibatchSize)/(sys.clock() - startTime), batch_error))
+                i/(numEpochs * numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
         end
     end
 end
@@ -129,8 +145,8 @@ local tn = 0
 local fn = 0
 for i = 1, test.labels:size()[1]
 do
-    local sample = test.data:narrow(1, i, 1)
-    local label = test.labels:narrow(1, i, 1)[1]
+    local sample = toCuda(test.data:narrow(1, i, 1))
+    local label = toCuda(test.labels:narrow(1, i, 1)[1])
     local pred = net:forward(sample)
     local max_prob = -math.huge
     local max_index = -math.huge
@@ -141,7 +157,6 @@ do
             max_index = j
         end
     end
-    print(label, max_index)
     if label == 1 and max_index == label then tn = tn + 1 end
     if label == 1 and max_index ~= label then fp = fp + 1 end
     if label ~= 1 and max_index == label then tp = tp + 1 end
