@@ -4,11 +4,11 @@ require 'optim'
 cmd = torch.CmdLine()
 cmd:option('-train', 'train','torch format train file list')
 cmd:option('-test', 'testa','torch format test file list')
-cmd:option('-minibatch', 32,'minibatch size')
+cmd:option('-minibatch', 64,'minibatch size')
 cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
 cmd:option('-embeddingDim', 64,'embedding dimension')
-cmd:option('-vocabSize', 100000,'vocabulary size')
+cmd:option('-vocabSize', 100005,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
@@ -106,10 +106,10 @@ toCuda(net)
 
 ----Do the optimization. All relevant tensors should be on the GPU. (if using cuda)
 local parameters, gradParameters = net:getParameters()
-local startTime = sys.clock()
 
 for epoch = 1, numEpochs
 do
+    local startTime = sys.clock()
     print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
     -- TODO wtf is wrong with the end of this
     for i = 1, numBatches - 100
@@ -130,8 +130,8 @@ do
         end
 
         optimMethod(fEval, parameters, optConfig, optState)
-        if(i % 50 == 0) then
-            print(string.format('%f percent complete \t speed = %f examples/sec \t error = %f',
+        if(i % 500 == 0) then
+            print(string.format('%f percent complete \t speed = %f examples/sec \t last batch error = %f',
                 i/(numEpochs * numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
         end
     end
@@ -146,7 +146,7 @@ local fn = 0
 for i = 1, test.labels:size()[1]
 do
     local sample = toCuda(test.data:narrow(1, i, 1))
-    local label = toCuda(test.labels:narrow(1, i, 1)[1])
+    local label = test.labels:narrow(1, i, 1)[1]
     local pred = net:forward(sample)
     local max_prob = -math.huge
     local max_index = -math.huge
