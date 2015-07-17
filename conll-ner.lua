@@ -16,6 +16,7 @@ cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 
 local params = cmd:parse(arg)
 
+
 useCuda = params.cuda == 1
 if(useCuda) then
     require 'cunn'
@@ -63,8 +64,8 @@ local numBatches = math.floor(train.data:size()[1]/minibatchSize)
 local dataBatches = {}
 local labelsBatches = {}
 local startIdx = 1
-local endIdx =  startIdx+minibatchSize-1 --(train.data:size()[1] - train.data:size()[1]) % minibatchSize
-while(endIdx-1 < train.labels:size()[1])
+local endIdx =  startIdx + minibatchSize - 1
+while(endIdx - 1 < train.labels:size()[1])
 do
     table.insert(dataBatches,toCuda(train.data:narrow(1, startIdx, endIdx-startIdx-1)))
     table.insert(labelsBatches,toCuda(train.labels:narrow(1, startIdx, endIdx-startIdx-1)))
@@ -72,26 +73,8 @@ do
     endIdx = startIdx + minibatchSize+1
 end
 
------ Set up network : We use a one-layer convnet and then max pooling across the time axis.
+---- setup network from nlp afs ----
 local net = nn.Sequential()
---- conv ---
---local convWidth = 3
---net:add(nn.LookupTable(vocabSize,embeddingDim))
---net:add(nn.TemporalConvolution(embeddingDim,embeddingDim,convWidth))
---net:add(nn.ReLU())
---net:add(nn.Transpose({2,3})) --this line and the next perform max pooling over the time axis
---net:add(nn.Max(3))
---net:add(nn.Linear(embeddingDim, numClasses))
---net:add(nn.LogSoftMax())
-
----- polyglot sortof ----
---net:add(nn.LookupTable(vocabSize,embeddingDim))
---net:add(nn.Reshape(concatDim))
---net:add(nn.Tanh(concatDim))
---net:add(nn.Linear(concatDim, numClasses))
---net:add(nn.LogSoftMax())
-
----- nlp afs ----
 net:add(nn.LookupTable(vocabSize,embeddingDim))
 net:add(nn.Reshape(concatDim))
 net:add(nn.Linear(concatDim, hiddenUnits))
@@ -99,14 +82,12 @@ net:add(nn.HardTanh())
 net:add(nn.Linear(hiddenUnits, numClasses))
 net:add(nn.LogSoftMax())
 
-
 local criterion = nn.ClassNLLCriterion()
 toCuda(criterion)
 toCuda(net)
 
-
+--- Evaluate ---
 local function evaluate()
-    --- Evaluate ---
     print ('Evaluating')
     local test = torch.load(test_file)
     local tp = 0
@@ -137,11 +118,11 @@ local function evaluate()
     local recall = tp / (tp + fn)
     local f1 = 2 * ((precision * recall) / (precision + recall))
     print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
-
 end
 
+
+--- Train ---
 local function train()
-    ----Do the optimization. All relevant tensors should be on the GPU. (if using cuda)
     local parameters, gradParameters = net:getParameters()
 
     for epoch = 1, numEpochs
@@ -155,7 +136,6 @@ local function train()
             local idx = (i % numBatches) + 1
             local sentences = dataBatches[idx]
             local labels = labelsBatches[idx]
-            local batch_error = 0
 
             -- update function
             local function fEval(x)
@@ -165,19 +145,18 @@ local function train()
                 local err = criterion:forward(output,labels)
                 local df_do = criterion:backward(output, labels)
                 net:backward(sentences, df_do)
-                batch_error = batch_error+err
+                epoch_error = epoch_error+err
                 return err, gradParameters
             end
             -- update gradients
             optimMethod(fEval, parameters, optConfig, optState)
-            epoch_error = epoch_error+batch_error
 
             if(i % 500 == 0) then
-                print(string.format('%f percent complete \t speed = %f examples/sec \t last batch error = %f',
-                    i/(numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
+                print(string.format('%f percent complete \t speed = %f examples/sec',
+                    i/(numBatches), (i*minibatchSize)/(sys.clock() - startTime)))
             end
         end
-        print (epoch_error)
+        print(string.format('Epoch error = %f', epoch_error))
         if (epoch % params.evaluateFrequency == 0) then evaluate() end
     end
 end

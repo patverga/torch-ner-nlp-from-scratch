@@ -23,38 +23,37 @@ model, load from one of these files at a time, so that the examples in your mini
 
 require 'torch'
 cmd = torch.CmdLine()
-cmd:option('-file','','input file')
+cmd:option('-inFile','','input file')
 cmd:option('-len','','uniform length for each sequence')
-cmd:option('-out','','out')
-
-
+cmd:option('-outFile','','out')
 local params = cmd:parse(arg)
-local expectedLen = params.len
-local fname = params.file
-local outFile = params.out
-local numLines = tonumber(io.popen(string.format('wc -l %s | cut -d" " -f1',fname)):read("*a"))
 
+print(params)
+
+local numLines = 0
+for _ in io.lines(params.inFile) do
+    numLines = numLines + 1
+end
 --os.execute(string.format('wc -l %s | cut -d" " -f1',fname))
 print(string.format('num input lines = %d',numLines))
 
 local labels = torch.Tensor(numLines)
-local data = torch.Tensor(numLines,expectedLen)
+local data = torch.Tensor(numLines, tonumber(params.len))
 
 local lineIdx = 0
-for line in io.lines(fname) do
+for line in io.lines(params.inFile) do
 	lineIdx = lineIdx + 1
-	local ctr = 0
 	for wordIdx in string.gmatch(line,'(%d+)%s*') do
-		local idx = tonumber(wordIdx)
+        local ctr = 0
+        local idx = tonumber(wordIdx)
 		if(ctr == 0) then
 			labels[lineIdx] = idx
 		else
-			--print(string.format("idx = %d got %d, expected %d",wordIdx,ctr,expectedLen))
 			data[lineIdx][ctr] = idx
 		end
 		ctr = ctr + 1
-	end
-	assert(ctr == expectedLen+1,string.format("got %d, expected %d",ctr,expectedLen))
+	assert(ctr == tonumber(params.len)+1,string.format("got %d, expected %d",ctr, tonumber(params.len)))
+    end
 end
 
 local stuff = {
@@ -63,5 +62,5 @@ local stuff = {
 
 }
 
-torch.save(outFile,stuff)
+torch.save(params.outFile,stuff)
 

@@ -6,20 +6,25 @@ window = 2
 vocab = {}
 labels = {}
 w2v_file = 'data/embeddings/polyglot-en.w2v.gz'
-in_dir = 'data/conll2003/'
+vector_out_file = 'data/embeddings/polyglot-en.index'
+data_dir = 'data/conll2003/'
+in_files = [data_dir+'eng.testa', data_dir+'eng.testb', data_dir+'eng.train']
 
 # create token -> index map
+out = open(vector_out_file, 'w')
 with gzip.open(w2v_file, 'rb') as f:
     next(f)
     for line in f:
-        token = line.split(' ')[0]
+        parts = line.split(' ')
+        token = parts[0]
         vocab[token] = str(len(vocab) + 1)
+        vector = parts[1:]
+        out.write(vocab[token] + '\t' + ' '.join(vector))
 print ('loaded ' + str(len(vocab)) + ' tokens to vocab')
-
+out.close()
 # iterate over train, dev, test files for conll
-for f in ['eng.testa', 'eng.testb', 'eng.train']:
-    print 'Processing ' + f
-    in_file = in_dir + f
+for in_file in in_files:
+    print 'Processing ' + in_file
     out_file = in_file + '.index'
 
     tokens = []
