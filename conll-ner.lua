@@ -15,7 +15,7 @@ cmd:option('-numEpochs', 5, 'number of epochs to train for')
 
 local params = cmd:parse(arg)
 
-if params.cuda == 1 then local useCuda = true else local useCuda = false end
+useCuda = params.cuda == 1
 if(useCuda) then
     require 'cunn'
     print('using GPU')
