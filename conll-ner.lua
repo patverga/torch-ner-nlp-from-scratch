@@ -22,7 +22,6 @@ local sentenceLength = 5
 local vocabSize = 100000
 local train = torch.load(train_file)
 
-
 --- model parameters
 local embeddingDim = 64
 local hiddenUnits = 300
@@ -114,7 +113,7 @@ do
             return err, gradParameters
         end
 
-        optimMethod(fEval, parameters)
+        optimMethod(fEval, parameters, optConfig, optState)
         if(i % 50 == 0) then
             print(string.format('%f percent complete \t speed = %f examples/sec \t error = %f',
                 i/numBatches, (i*minibatchSize)/(sys.clock() - startTime), batch_error))
