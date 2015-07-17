@@ -2,8 +2,8 @@ require 'torch'
 require 'optim'
 
 cmd = torch.CmdLine()
-cmd:option('-train', 'train','torch format train file list')
-cmd:option('-test', 'testa','torch format test file list')
+cmd:option('-train', 'data/conll2003/eng.train.torch','torch format train file list')
+cmd:option('-test', 'data/conll2003/eng.testa.torch','torch format test file list')
 cmd:option('-minibatch', 64,'minibatch size')
 cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
@@ -146,6 +146,7 @@ local function train()
 
     for epoch = 1, numEpochs
     do
+        local epoch_error = 0
         local startTime = sys.clock()
         print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
         -- TODO wtf is wrong with the end of this
@@ -155,6 +156,8 @@ local function train()
             local sentences = dataBatches[idx]
             local labels = labelsBatches[idx]
             local batch_error = 0
+
+            -- update function
             local function fEval(x)
                 if parameters ~= x then parameters:copy(x) end
                 net:zeroGradParameters()
@@ -165,13 +168,16 @@ local function train()
                 batch_error = batch_error+err
                 return err, gradParameters
             end
-
+            -- update gradients
             optimMethod(fEval, parameters, optConfig, optState)
+            epoch_error = epoch_error+batch_error
+
             if(i % 500 == 0) then
                 print(string.format('%f percent complete \t speed = %f examples/sec \t last batch error = %f',
-                    i/(numEpochs * numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
+                    i/(numBatches), (i*minibatchSize)/(sys.clock() - startTime), batch_error))
             end
         end
+        print (epoch_error)
         if (epoch % params.evaluateFrequency == 0) then evaluate() end
     end
 end
