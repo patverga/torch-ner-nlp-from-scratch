@@ -34,7 +34,6 @@ local numLines = 0
 for _ in io.lines(params.inFile) do
     numLines = numLines + 1
 end
---os.execute(string.format('wc -l %s | cut -d" " -f1',fname))
 print(string.format('num input lines = %d',numLines))
 
 local labels = torch.Tensor(numLines)
@@ -62,5 +61,5 @@ local stuff = {
 
 }
 
-torch.save(params.outFile,stuff)
+torch.save(params.outFile, stuff)
 

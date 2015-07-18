@@ -8,11 +8,12 @@ cmd:option('-minibatch', 64,'minibatch size')
 cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
 cmd:option('-embeddingDim', 64,'embedding dimension')
-cmd:option('-vocabSize', 100005,'vocabulary size')
+cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
+cmd:option('-preloadEmbeddings', '', 'file containing serialized torch embeddings')
 
 local params = cmd:parse(arg)
 
@@ -73,9 +74,19 @@ do
     endIdx = startIdx + minibatchSize+1
 end
 
+---- preload embeddings if specified ----
+local lookupTable = nn.LookupTable(vocabSize,embeddingDim)
+if params.preloadEmbeddings ~= '' then
+    local data = torch.load(params.preloadEmbeddings)
+    vocabSize = data.data:size()[1]
+    embeddingDim = data.data:size()[2]
+    lookupTable = nn.LookupTable(vocabSize,embeddingDim)
+    lookupTable.weights = data.data
+end
+
 ---- setup network from nlp afs ----
 local net = nn.Sequential()
-net:add(nn.LookupTable(vocabSize,embeddingDim))
+net:add(lookupTable)
 net:add(nn.Reshape(concatDim))
 net:add(nn.Linear(concatDim, hiddenUnits))
 net:add(nn.HardTanh())
