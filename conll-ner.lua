@@ -14,6 +14,7 @@ cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
+cmd:option('-saveModel', '', 'file to save the trained model to')
 
 local params = cmd:parse(arg)
 
@@ -85,7 +86,6 @@ if params.loadEmbeddings ~= '' then
     lookupTable.weight = data.data
 end
 
-
 ---- setup network from nlp afs ----
 local net = nn.Sequential()
 net:add(lookupTable)
@@ -131,13 +131,14 @@ local function evaluate()
     local recall = tp / (tp + fn)
     local f1 = 2 * ((precision * recall) / (precision + recall))
     print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
+    return f1
 end
 
 
 --- Train ---
 local function train()
     local parameters, gradParameters = net:getParameters()
-
+    local last_f1 = 0.0
     for epoch = 1, numEpochs
     do
         local epoch_error = 0
@@ -170,8 +171,15 @@ local function train()
             end
         end
         print(string.format('Epoch error = %f', epoch_error))
-        if (epoch % params.evaluateFrequency == 0) then evaluate() end
+        if (epoch % params.evaluateFrequency == 0) then
+            local f1 = evaluate()
+            -- end training early if f1 goes down
+            -- TODO we want the last/better model, not this one
+            if f1 < last_f1 then break end
+        end
     end
+    -- save the trained model if location specified
+    if params.saveModel ~= '' then torch.save(params.saveModel, net) end
 end
 
 train()
