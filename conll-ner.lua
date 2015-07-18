@@ -13,7 +13,7 @@ cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
-cmd:option('-preloadEmbeddings', '', 'file containing serialized torch embeddings')
+cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
 
 local params = cmd:parse(arg)
 
@@ -76,13 +76,15 @@ end
 
 ---- preload embeddings if specified ----
 local lookupTable = nn.LookupTable(vocabSize,embeddingDim)
-if params.preloadEmbeddings ~= '' then
-    local data = torch.load(params.preloadEmbeddings)
+if params.loadEmbeddings ~= '' then
+    print('preloading embeddings from ' .. params.loadEmbeddings)
+    local data = torch.load(params.loadEmbeddings)
     vocabSize = data.data:size()[1]
     embeddingDim = data.data:size()[2]
     lookupTable = nn.LookupTable(vocabSize,embeddingDim)
-    lookupTable.weights = data.data
+    lookupTable.weight = data.data
 end
+
 
 ---- setup network from nlp afs ----
 local net = nn.Sequential()
