@@ -43,8 +43,8 @@ local data = torch.Tensor(numLines, tonumber(params.len))
 local lineIdx = 0
 for line in io.lines(params.inFile) do
 	lineIdx = lineIdx + 1
-	for wordIdx in string.gmatch(line,'(%d+)%s*') do
-        local ctr = 0
+	local ctr = 0
+	for wordIdx in string.gmatch(line,"%S+") do
         local idx = tonumber(wordIdx)
 		if(ctr == 0) then
 			labels[lineIdx] = idx
@@ -52,8 +52,8 @@ for line in io.lines(params.inFile) do
 			data[lineIdx][ctr] = idx
 		end
 		ctr = ctr + 1
+	end
 	assert(ctr == tonumber(params.len)+1,string.format("got %d, expected %d",ctr, tonumber(params.len)))
-    end
 end
 
 local stuff = {
