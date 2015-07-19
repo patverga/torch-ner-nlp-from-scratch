@@ -208,7 +208,7 @@ local function train_model()
     do
         local epoch_error = 0
         local startTime = sys.clock()
-        print('Starting epoch ' .. epoch .. ' of ' .. numEpochs)
+        io.write('Starting epoch ', epoch, ' of ', numEpochs, '\n')
         -- TODO wtf is wrong with the end of this
         for i = 1, numBatches - 100
         do
@@ -230,9 +230,10 @@ local function train_model()
             -- update gradients
             optimMethod(fEval, parameters, optConfig, optState)
 
-            if(i % 500 == 0) then
-                print(string.format('%f percent complete \t speed = %f examples/sec',
+            if(i % 50 == 0) then
+                io.write(string.format('\r%.3f percent complete\tspeed = %.2f examples/sec',
                     i/(numBatches), (i*minibatchSize)/(sys.clock() - startTime)))
+                io.flush()
             end
         end
         print(string.format('Epoch error = %f', epoch_error))
