@@ -7,7 +7,7 @@ cmd:option('-test', 'data/conll2003/eng.testa.torch','torch format test file lis
 cmd:option('-minibatch', 64,'minibatch size')
 cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
-cmd:option('-labelMap', 'data/conll2003/lebel-map.index','file containing map from label strings to index. needed for entity level evaluation')
+cmd:option('-labelMap', 'data/conll2003/label-map.index','file containing map from label strings to index. needed for entity level evaluation')
 cmd:option('-embeddingDim', 64,'embedding dimension')
 cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
@@ -88,13 +88,30 @@ toCuda(criterion)
 toCuda(net)
 
 --- Evaluate ---
-local function evaluate()
-    -- load maps to chunk entities
-    local label_map = {}
-    for line in io.lines(params.labelMap) do
-        local label_string, label_index = string.match(line,'([^\t]+)\t([^\t]+)')
-        label_map[label_index] = label_string
+local function predict(sample)
+    local pred = net:forward(sample)
+    -- find the label with the max score
+    local max_prob = -math.huge
+    local max_index = -math.huge
+    for c = 1, numClasses
+    do
+        if pred[c] > max_prob then
+            max_prob = pred[c]
+            max_index = c
+        end
     end
+    return max_index
+end
+
+local function evaluate()
+    local label_index_str_map = {}
+    local label_str_index_map = {}
+    for line in io.lines(params.labelMap) do
+        local label_string, label_index = string.match(line, "([^\t]+)\t([^\t]+)")
+        label_index_str_map[tonumber(label_index)] = label_string
+        label_str_index_map[label_string] = tonumber(label_index)
+    end
+    local O_index = label_str_index_map["O"]
 
     print ('Evaluating')
     local test = torch.load(test_file)
@@ -102,20 +119,60 @@ local function evaluate()
     local fp = 0
     local tn = 0
     local fn = 0
+    local i = 1
+    while (i <test.labels:size()[1])
+    do
+        local s = toCuda(test.data:select(1, i))
+        local l = test.labels:select(1, i)
+        i = i + 1
+        -- O, just score
+        if (l == O_index) then
+            if predict(s) == l then tn = tn + 1 else fp = fp + 1 end
+        else
+        -- score the entire entity
+            local correct = true
+            if predict(s) ~= l then correct = false end
+            local last_l = l
+            -- replace B-* tags with I-* since they are only important for delimeting
+            if (string.sub(label_index_str_map[l], 1, 1) == 'B') then
+                -- replace this B-* tag with the index of its I-* equivalent
+                local last_l = label_str_index_map[label_index_str_map[l]:gsub("^%l", 'I')]
+            end
+            s = toCuda(test.data:select(1, i))
+            l = test.labels:select(1, i)
+            -- while this token is still part of the current entity
+            while (last_l == l) do
+                if predict(s) ~= l then correct = false end
+                i = i + 1
+                s = toCuda(test.data:select(1, i))
+                l = test.labels:select(1, i)
+            end
+            if correct then tp = tp + 1 else fn = fn + 1 end
+        end
+    end
+
+    local precision = tp / (tp + fp)
+    local recall = tp / (tp + fn)
+    local f1 = 2 * ((precision * recall) / (precision + recall))
+    print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
+    return f1
+end
+
+
+local function evaluate_per_token()
+    print ('Evaluating per token accuracy')
+    local test = torch.load(test_file)
+    local tp = 0
+    local fp = 0
+    local tn = 0
+    local fn = 0
     for i = 1, test.labels:size()[1]
     do
-        local sample = toCuda(test.data:narrow(1, i, 1))
-        local label = test.labels:narrow(1, i, 1)[1]
-        local pred = net:forward(sample)
-        local max_prob = -math.huge
-        local max_index = -math.huge
-        for j = 1, numClasses
-        do
-            if pred[1][j] > max_prob then
-                max_prob = pred[1][j]
-                max_index = j
-            end
-        end
+        -- get a score for each label on this sample
+        local sample = toCuda(test.data:select(1, i))
+        local label = test.labels:select(1, i)
+        local max_index = predict(sample)
+        -- update counts
         if label == 1 and max_index == label then tn = tn + 1 end
         if label == 1 and max_index ~= label then fp = fp + 1 end
         if label ~= 1 and max_index == label then tp = tp + 1 end
@@ -181,6 +238,7 @@ local function train_model()
         print(string.format('Epoch error = %f', epoch_error))
         if (epoch % params.evaluateFrequency == 0) then
             local f1 = evaluate()
+            local f1 = evaluate_per_token()
             -- end training early if f1 goes down
             -- TODO we want the last/better model, not this one
             if f1 < last_f1 then break end
