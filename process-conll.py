@@ -8,6 +8,8 @@ labels = {}
 w2v_file = 'data/embeddings/polyglot-en.w2v.gz'
 vector_out_file = 'data/embeddings/polyglot-en.index'
 data_dir = 'data/conll2003/'
+vocab_map_file = 'data/conll2003/vocab-map.index'
+label_map_file = 'data/conll2003/label-map.index'
 in_files = [data_dir+'eng.testa', data_dir+'eng.testb', data_dir+'eng.train']
 
 # create token -> index map
@@ -70,3 +72,13 @@ for in_file in in_files:
     for w in labeled_windows:
         out.write(w + '\n')
     out.close()
+
+# export maps
+out = open(vocab_map_file, 'w')
+for t, i in vocab.iteritems():
+    out.write(t + '\t' + str(i) +'\n')
+out.close()
+out = open(label_map_file, 'w')
+for l, i in labels.iteritems():
+    out.write(l + '\t' + str(i) +'\n')
+out.close()

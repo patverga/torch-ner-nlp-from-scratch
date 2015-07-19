@@ -7,6 +7,7 @@ cmd:option('-test', 'data/conll2003/eng.testa.torch','torch format test file lis
 cmd:option('-minibatch', 64,'minibatch size')
 cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
+cmd:option('-labelMap', 'data/conll2003/lebel-map.index','file containing map from label strings to index. needed for entity level evaluation')
 cmd:option('-embeddingDim', 64,'embedding dimension')
 cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
@@ -38,6 +39,7 @@ end
 --- data parameters
 local train_file = params.train
 local test_file = params.test
+local label_map_file = params.labelMap
 local sentenceLength = params.sentenceLength
 local vocabSize = params.vocabSize
 local train = torch.load(train_file)
@@ -60,20 +62,6 @@ local optState = {}
 local optimMethod = optim.sgd
 local numEpochs = params.numEpochs
 local numBatches = math.floor(train.data:size()[1]/minibatchSize)
-
-
---- split training data into batches
-local dataBatches = {}
-local labelsBatches = {}
-local startIdx = 1
-local endIdx =  startIdx + minibatchSize - 1
-while(endIdx - 1 < train.labels:size()[1])
-do
-    table.insert(dataBatches,toCuda(train.data:narrow(1, startIdx, endIdx-startIdx-1)))
-    table.insert(labelsBatches,toCuda(train.labels:narrow(1, startIdx, endIdx-startIdx-1)))
-    startIdx = endIdx
-    endIdx = startIdx + minibatchSize+1
-end
 
 ---- preload embeddings if specified ----
 local lookupTable = nn.LookupTable(vocabSize,embeddingDim)
@@ -101,6 +89,13 @@ toCuda(net)
 
 --- Evaluate ---
 local function evaluate()
+    -- load maps to chunk entities
+    local label_map = {}
+    for line in io.lines(params.labelMap) do
+        local label_string, label_index = string.match(line,'([^\t]+)\t([^\t]+)')
+        label_map[label_index] = label_string
+    end
+
     print ('Evaluating')
     local test = torch.load(test_file)
     local tp = 0
@@ -136,7 +131,20 @@ end
 
 
 --- Train ---
-local function train()
+local function train_model()
+    --- split training data into batches
+    local dataBatches = {}
+    local labelsBatches = {}
+    local startIdx = 1
+    local endIdx =  startIdx + minibatchSize - 1
+    while(endIdx - 1 < train.labels:size()[1])
+    do
+        table.insert(dataBatches,toCuda(train.data:narrow(1, startIdx, endIdx-startIdx-1)))
+        table.insert(labelsBatches,toCuda(train.labels:narrow(1, startIdx, endIdx-startIdx-1)))
+        startIdx = endIdx
+        endIdx = startIdx + minibatchSize+1
+    end
+
     local parameters, gradParameters = net:getParameters()
     local last_f1 = 0.0
     for epoch = 1, numEpochs
@@ -182,4 +190,4 @@ local function train()
     if params.saveModel ~= '' then torch.save(params.saveModel, net) end
 end
 
-train()
+train_model()
