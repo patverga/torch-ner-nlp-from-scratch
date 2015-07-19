@@ -39,7 +39,6 @@ end
 --- data parameters
 local train_file = params.train
 local test_file = params.test
-local label_map_file = params.labelMap
 local sentenceLength = params.sentenceLength
 local vocabSize = params.vocabSize
 local train = torch.load(train_file)
@@ -103,6 +102,7 @@ local function predict(sample)
     return max_index
 end
 
+--- evaluate scores by chunking entities with BIO tags
 local function evaluate()
     local label_index_str_map = {}
     local label_str_index_map = {}
@@ -135,7 +135,6 @@ local function evaluate()
             local last_l = l
             -- replace B-* tags with I-* since they are only important for delimeting
             if (string.sub(label_index_str_map[l], 1, 1) == 'B') then
-                -- replace this B-* tag with the index of its I-* equivalent
                 local last_l = label_str_index_map[label_index_str_map[l]:gsub("^%l", 'I')]
             end
             s = toCuda(test.data:select(1, i))
@@ -157,7 +156,6 @@ local function evaluate()
     print(string.format('F1 : %f\t Recall : %f\tPrecision : %f', f1, recall, precision))
     return f1
 end
-
 
 local function evaluate_per_token()
     print ('Evaluating per token accuracy')
@@ -237,15 +235,14 @@ local function train_model()
             end
         end
         print(string.format('Epoch error = %f', epoch_error))
-        if (epoch % params.evaluateFrequency == 0) then
+        if (epoch % params.evaluateFrequency == 0 or epoch == params.numEpochs) then
             local f1 = evaluate()
-            local f1 = evaluate_per_token()
             -- end training early if f1 goes down
-            -- TODO we want the last/better model, not this one
-            if f1 < last_f1 then break end
+            if f1 < last_f1 then break else last_f1 = f1 end
+            -- save the trained model if location specified
+            if params.saveModel ~= '' then torch.save(params.saveModel, net) end
         end
     end
-    -- save the trained model if location specified
     if params.saveModel ~= '' then torch.save(params.saveModel, net) end
 end
 
