@@ -19,7 +19,6 @@ cmd:option('-saveModel', '', 'file to save the trained model to')
 
 local params = cmd:parse(arg)
 
-
 useCuda = params.cuda == 1
 if(useCuda) then
     require 'cunn'
@@ -234,7 +233,7 @@ local function train_model()
                 io.flush()
             end
         end
-        print(string.format('Epoch error = %f', epoch_error))
+        print(string.format('\nEpoch error = %f', epoch_error))
         if (epoch % params.evaluateFrequency == 0 or epoch == params.numEpochs) then
             local f1 = evaluate()
             -- end training early if f1 goes down
