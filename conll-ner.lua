@@ -2,7 +2,7 @@ require 'torch'
 require 'optim'
 
 cmd = torch.CmdLine()
-cmd:option('-cuda', 0,'whether to use gpu')
+cmd:option('-cuda', false,'whether to use gpu')
 -- data file locations
 cmd:option('-train', 'data/conll2003/eng.train.torch','torch format train file list')
 cmd:option('-test', 'data/conll2003/eng.testa.torch','torch format test file list')
@@ -27,8 +27,7 @@ cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 
 local params = cmd:parse(arg)
 
-useCuda = params.cuda == 1
-if(useCuda) then
+if(params.cuda) then
     require 'cunn'
     print('using GPU')
 else
@@ -36,7 +35,7 @@ else
     print ('using CPU')
 end
 
-local function toCuda(x) return useCuda and x:cuda() or x end
+local function toCuda(x) return params.cuda and x:cuda() or x end
 
 --- data parameters
 local train_file = params.train
@@ -83,7 +82,7 @@ if params.tanh then net:add(nn.Tanh()) else net:add(nn.HardTanh()) end
 net:add(nn.Linear(hiddenUnits, numClasses))
 net:add(nn.LogSoftMax())
 
-local criterion = params.hinge and nn.MultiMarginCriterion(1) or nn.ClassNLLCriterion()
+local criterion = params.hinge and nn.MultiMarginCriterion() or nn.ClassNLLCriterion()
 toCuda(criterion)
 toCuda(net)
 
@@ -220,6 +219,7 @@ local function train_model()
                 net:zeroGradParameters()
                 local output = net:forward(sentences)
                 local err = criterion:forward(output,labels)
+                print (output, labels)
                 local df_do = criterion:backward(output, labels)
                 net:backward(sentences, df_do)
                 epoch_error = epoch_error+err
