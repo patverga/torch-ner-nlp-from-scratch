@@ -15,7 +15,7 @@ cmd:option('-embeddingDim', 64,'embedding dimension')
 cmd:option('-hiddenDim', 300,'hidden layer dimension')
 cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
-cmd:option('-minibatch', 64,'minibatch size')
+cmd:option('-batchSize', 64,'minibatch size')
 -- optimization
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-tanh', false,'use tanh layer, hardTanh otherwise')
@@ -35,11 +35,12 @@ else
     print ('using CPU')
 end
 local function toCuda(x)
-    local y = x
-    if(useCuda) then
-        y = x:cuda()
-    end
-    return y
+    return useCuda and x:cuda() or x
+--    local y = x
+--    if(useCuda) then
+--        y = x:cuda()
+--    end
+--    return y
 end
 
 --- data parameters
@@ -52,7 +53,6 @@ local train = torch.load(train_file)
 --- model parameters
 local embeddingDim = params.embeddingDim
 local hiddenUnits = params.hiddenDim
-local minibatchSize = params.minibatch
 local numClasses = params.labelDim
 local concatDim = embeddingDim * sentenceLength
 
@@ -66,7 +66,7 @@ local optConfig = {
 local optState = {}
 local optimMethod = params.adagrad and optim.adagrad or optim.sgd
 local numEpochs = params.numEpochs
-local numBatches = math.floor(train.data:size()[1]/minibatchSize)
+local numBatches = math.floor(train.data:size(1)/params.batchSize)
 
 ---- preload embeddings if specified ----
 local lookupTable = nn.LookupTable(vocabSize,embeddingDim)
@@ -194,31 +194,30 @@ end
 --- Train ---
 local function train_model()
     --- split training data into batches
-    local dataBatches = {}
-    local labelsBatches = {}
-    local startIdx = 1
-    local endIdx =  startIdx + minibatchSize - 1
-    while(endIdx - 1 < train.labels:size()[1])
-    do
-        table.insert(dataBatches,toCuda(train.data:narrow(1, startIdx, endIdx-startIdx-1)))
-        table.insert(labelsBatches,toCuda(train.labels:narrow(1, startIdx, endIdx-startIdx-1)))
-        startIdx = endIdx
-        endIdx = startIdx + minibatchSize+1
+    local data_batches = {}
+    local label_batches = {}
+    local start = 1
+    while start <= train.labels:size(1) do
+        local size = math.min(params.batchSize, train.labels:size(1) - start + 1)
+        table.insert(label_batches, toCuda(train.labels:narrow(1, start, size)))
+        table.insert(data_batches, toCuda(train.data:narrow(1, start, size)))
+        start = start + size
     end
 
     local parameters, gradParameters = net:getParameters()
     local last_f1 = 0.0
     for epoch = 1, numEpochs
     do
+        -- randomly shuffle mini batches
+        local shuffle = torch.randperm(numBatches)
         local epoch_error = 0
         local startTime = sys.clock()
         io.write('Starting epoch ', epoch, ' of ', numEpochs, '\n')
-        -- TODO wtf is wrong with the end of this
-        for i = 1, numBatches - 100
+        for i = 1, numBatches
         do
-            local idx = (i % numBatches) + 1
-            local sentences = dataBatches[idx]
-            local labels = labelsBatches[idx]
+            local idx = shuffle[i]
+            local sentences = data_batches[idx]
+            local labels = label_batches[idx]
 
             -- update function
             local function fEval(x)
@@ -236,7 +235,7 @@ local function train_model()
 
             if(i % 50 == 0) then
                 io.write(string.format('\r%.3f percent complete\tspeed = %.2f examples/sec',
-                    i/(numBatches), (i*minibatchSize)/(sys.clock() - startTime)))
+                    i/(numBatches), (i*params.batchSize)/(sys.clock() - startTime)))
                 io.flush()
             end
         end
