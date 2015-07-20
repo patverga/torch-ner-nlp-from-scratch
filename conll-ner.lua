@@ -52,10 +52,10 @@ local concatDim = embeddingDim * sentenceLength
 
 --- optimization parameters
 local optConfig = {
-    learningRate = params.learningRate,
 --    learningRateDecay = params.learningRateDecay,
 --    momentum = useMomentum,
 --    dampening = dampening,
+
 }
 local optState = {}
 local optimMethod = params.adagrad and optim.adagrad or optim.sgd
