@@ -83,7 +83,7 @@ if params.tanh then net:add(nn.Tanh()) else net:add(nn.HardTanh()) end
 net:add(nn.Linear(hiddenUnits, numClasses))
 net:add(nn.LogSoftMax())
 
-local criterion = params.hinge and nn.MultiMarginCriterion() or nn.ClassNLLCriterion()
+local criterion = params.hinge and nn.MultiMarginCriterion(1) or nn.ClassNLLCriterion()
 toCuda(criterion)
 toCuda(net)
 
