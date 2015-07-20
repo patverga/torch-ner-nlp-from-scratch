@@ -3,7 +3,7 @@ __author__ = 'pv'
 import random
 
 window = 2
-vocabs = [{},{}]
+vocabs = [{}, {}]
 labels = {}
 out_dir = 'data/multilingual/'
 vocab_map_file = out_dir + 'vocab-map.index'
@@ -30,26 +30,15 @@ for i in range(0,2):
         vector = parts[1]
         out.write(vocab[token] + '\t' + vector)
     offset += len(vocab)
-    if '<UNK>' not in vocab:
-        offset += 1
-        vocab['<UNK>'] = offset
-        out.write(str(vocab['<UNK>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
-    if '<PAD>' not in vocab:
-        offset += 1
-        vocab['<PAD>'] = offset
-        out.write(str(vocab['<PAD>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
-    if '<S>' not in vocab:
-        offset += 1
-        vocab['<S>'] = offset
-        out.write(str(vocab['<S>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
-    if '<\S>' not in vocab:
-        offset += 1
-        vocab['<\S>'] = offset
-        out.write(str(vocab['<\S>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
-
+    for token in ['<UNK>', '<PAD>', '<S>', '</S>']:
+        if token not in vocab:
+            vocab[token] = str(offset + 1)
+            vector = ' '.join(map(str, [random.random() for _ in range(0, dim)]))
+            out.write(vocab[token] + '\t' + vector)
+            offset += 1
 out.close()
-print ('loaded ' + str(offset) + ' tokens to vocab')
 
+print ('loaded ' + str(offset) + '\t' + str(len(vocabs[0]) + len(vocabs[1])) + ' tokens to vocab')
 
 offset = 0
 for i in range(0, 2):

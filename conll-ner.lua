@@ -67,8 +67,8 @@ local lookupTable = nn.LookupTable(vocabSize,embeddingDim)
 if params.loadEmbeddings ~= '' then
     print('preloading embeddings from ' .. params.loadEmbeddings)
     local data = torch.load(params.loadEmbeddings)
-    vocabSize = data.data:size()[1]
-    embeddingDim = data.data:size()[2]
+    vocabSize = data.data:size(1)
+    embeddingDim = data.data:size(2)
     lookupTable = nn.LookupTable(vocabSize,embeddingDim)
     lookupTable.weight = data.data
 end

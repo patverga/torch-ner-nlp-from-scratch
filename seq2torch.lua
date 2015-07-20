@@ -51,6 +51,7 @@ for line in io.lines(params.inFile) do
 			data[lineIdx][ctr] = idx
 		end
 		ctr = ctr + 1
+        if (ctr > tonumber(params.len)) then break end
 	end
 	assert(ctr == tonumber(params.len)+1,string.format("got %d, expected %d",ctr, tonumber(params.len)))
 end
