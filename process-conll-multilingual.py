@@ -1,5 +1,7 @@
 __author__ = 'pv'
 
+import random
+
 window = 2
 vocabs = [{},{}]
 labels = {}
@@ -12,6 +14,8 @@ in_dirs = ['data/conll2003/', 'data/conll2002/']
 en_files = ['eng.testa', 'eng.testb', 'eng.train']
 es_files = ['esp.testa', 'esp.testb', 'esp.train']
 in_files = [en_files, es_files]
+
+dim = 200
 
 
 # create token -> index map
@@ -26,13 +30,24 @@ for i in range(0,2):
         vector = parts[1]
         out.write(vocab[token] + '\t' + vector)
     offset += len(vocab)
-out.close()
+    if '<UNK>' not in vocab:
+        offset += 1
+        vocab['<UNK>'] = offset
+        out.write(str(vocab['<UNK>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
+    if '<PAD>' not in vocab:
+        offset += 1
+        vocab['<PAD>'] = offset
+        out.write(str(vocab['<PAD>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
+    if '<S>' not in vocab:
+        offset += 1
+        vocab['<S>'] = offset
+        out.write(str(vocab['<S>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
+    if '<\S>' not in vocab:
+        offset += 1
+        vocab['<\S>'] = offset
+        out.write(str(vocab['<\S>']) + '\t' + ' '.join(map(str, [random.random() for _ in range(0, dim)])))
 
-for vocab in vocabs:
-    vocab['<UNK>'] = offset+1
-    vocab['<PAD>'] = offset+2
-    vocab['<S>'] = offset+3
-    vocab['<\S>'] = offset+4
+out.close()
 print ('loaded ' + str(offset) + ' tokens to vocab')
 
 
