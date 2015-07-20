@@ -14,6 +14,7 @@ cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-tanh', false,'use tanh layer, hardTanh otherwise')
+cmd:option('-adagrad', false,'use adagrad to optimize, sgd otherwise')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
@@ -59,7 +60,7 @@ local optConfig = {
 --    dampening = dampening,
 }
 local optState = {}
-local optimMethod = optim.sgd
+local optimMethod = params.adagrad and optim.adagrad or optim.sgd
 local numEpochs = params.numEpochs
 local numBatches = math.floor(train.data:size()[1]/minibatchSize)
 
