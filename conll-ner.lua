@@ -219,7 +219,6 @@ local function train_model()
                 net:zeroGradParameters()
                 local output = net:forward(sentences)
                 local err = criterion:forward(output,labels)
-                print (output, labels)
                 local df_do = criterion:backward(output, labels)
                 net:backward(sentences, df_do)
                 epoch_error = epoch_error+err
