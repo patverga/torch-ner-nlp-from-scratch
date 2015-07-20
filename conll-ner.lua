@@ -9,10 +9,11 @@ cmd:option('-cuda', 0,'whether to use gpu')
 cmd:option('-labelDim', 8,'label dimension')
 cmd:option('-labelMap', 'data/conll2003/label-map.index','file containing map from label strings to index. needed for entity level evaluation')
 cmd:option('-embeddingDim', 64,'embedding dimension')
+cmd:option('-hiddenDim', 300,'hidden layer dimension')
 cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-learningRate', 0.01,'init learning rate')
-cmd:option('-hardTanh', true,'use hardTanh layer, regular tanh otherwise')
+cmd:option('-tanh', false,'use tanh layer, hardTanh otherwise')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
@@ -45,7 +46,7 @@ local train = torch.load(train_file)
 
 --- model parameters
 local embeddingDim = params.embeddingDim
-local hiddenUnits = 300
+local hiddenUnits = params.hiddenDim
 local minibatchSize = params.minibatch
 local numClasses = params.labelDim
 local concatDim = embeddingDim * sentenceLength
@@ -78,7 +79,7 @@ local net = nn.Sequential()
 net:add(lookupTable)
 net:add(nn.Reshape(concatDim))
 net:add(nn.Linear(concatDim, hiddenUnits))
-if params.hardTanh then net:add(nn.HardTanh()) else net:add(nn.Tanh()) end
+if params.tanh then net:add(nn.Tanh()) else net:add(nn.HardTanh()) end
 net:add(nn.Linear(hiddenUnits, numClasses))
 net:add(nn.LogSoftMax())
 
