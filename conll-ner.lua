@@ -2,23 +2,27 @@ require 'torch'
 require 'optim'
 
 cmd = torch.CmdLine()
+cmd:option('-cuda', 0,'whether to use gpu')
+-- data file locations
 cmd:option('-train', 'data/conll2003/eng.train.torch','torch format train file list')
 cmd:option('-test', 'data/conll2003/eng.testa.torch','torch format test file list')
-cmd:option('-minibatch', 64,'minibatch size')
-cmd:option('-cuda', 0,'whether to use gpu')
-cmd:option('-labelDim', 8,'label dimension')
+cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
+cmd:option('-saveModel', '', 'file to save the trained model to')
 cmd:option('-labelMap', 'data/conll2003/label-map.index','file containing map from label strings to index. needed for entity level evaluation')
+-- model / data sizes
+cmd:option('-labelDim', 8,'label dimension')
 cmd:option('-embeddingDim', 64,'embedding dimension')
 cmd:option('-hiddenDim', 300,'hidden layer dimension')
 cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
+cmd:option('-minibatch', 64,'minibatch size')
+-- optimization
 cmd:option('-learningRate', 0.01,'init learning rate')
 cmd:option('-tanh', false,'use tanh layer, hardTanh otherwise')
 cmd:option('-adagrad', false,'use adagrad to optimize, sgd otherwise')
+cmd:option('-stopEarly', false,'stop training early if evaluation F1 goes down')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
-cmd:option('-loadEmbeddings', '', 'file containing serialized torch embeddings')
-cmd:option('-saveModel', '', 'file to save the trained model to')
 
 local params = cmd:parse(arg)
 
@@ -240,7 +244,7 @@ local function train_model()
         if (epoch % params.evaluateFrequency == 0 or epoch == params.numEpochs) then
             local f1 = evaluate()
             -- end training early if f1 goes down
-            if f1 < last_f1 then break else last_f1 = f1 end
+            if params.stopEarly and f1 < last_f1 then break else last_f1 = f1 end
             -- save the trained model if location specified
             if params.saveModel ~= '' then torch.save(params.saveModel, net) end
         end
