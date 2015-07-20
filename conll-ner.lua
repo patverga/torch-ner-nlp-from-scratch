@@ -17,10 +17,11 @@ cmd:option('-vocabSize', 100004,'vocabulary size')
 cmd:option('-sentenceLength', 5,'length of input sequences')
 cmd:option('-batchSize', 64,'minibatch size')
 -- optimization
-cmd:option('-learningRate', 0.01,'init learning rate')
-cmd:option('-tanh', false,'use tanh layer, hardTanh otherwise')
-cmd:option('-adagrad', false,'use adagrad to optimize, sgd otherwise')
-cmd:option('-stopEarly', false,'stop training early if evaluation F1 goes down')
+cmd:option('-learningRate', 0.01, 'init learning rate')
+cmd:option('-tanh', false, 'use tanh layer, hardTanh otherwise')
+cmd:option('-adagrad', false, 'use adagrad to optimize, sgd otherwise')
+cmd:option('-hinge', false, 'use hinge loss while training, nll otherwise')
+cmd:option('-stopEarly', false, 'stop training early if evaluation F1 goes down')
 cmd:option('-numEpochs', 5, 'number of epochs to train for')
 cmd:option('-evaluateFrequency', 5, 'number of epochs to train for')
 
@@ -34,14 +35,8 @@ else
     require 'nn'
     print ('using CPU')
 end
-local function toCuda(x)
-    return useCuda and x:cuda() or x
---    local y = x
---    if(useCuda) then
---        y = x:cuda()
---    end
---    return y
-end
+
+local function toCuda(x) return useCuda and x:cuda() or x end
 
 --- data parameters
 local train_file = params.train
@@ -88,7 +83,7 @@ if params.tanh then net:add(nn.Tanh()) else net:add(nn.HardTanh()) end
 net:add(nn.Linear(hiddenUnits, numClasses))
 net:add(nn.LogSoftMax())
 
-local criterion = nn.ClassNLLCriterion()
+local criterion = params.hinge and nn.MultiMarginCriterion() or nn.ClassNLLCriterion()
 toCuda(criterion)
 toCuda(net)
 
