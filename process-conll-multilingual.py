@@ -21,7 +21,7 @@ dim = 200
 # create token -> index map
 offset = 0
 out = open(vector_out_file, 'w')
-for i in range(0,2):
+for i in range(0, 2):
     vocab = vocabs[i]
     for line in open(w2v_files[i], 'r'):
         parts = line.split('\t')
@@ -29,15 +29,14 @@ for i in range(0,2):
         vocab[token] = str(len(vocab) + 1 + offset)
         vector = parts[1]
         out.write(vocab[token] + '\t' + vector)
-    offset += len(vocab)
+        offset += len(vocab)
     for token in ['<UNK>', '<PAD>', '<S>', '</S>']:
         if token not in vocab:
             vocab[token] = str(offset + 1)
             vector = ' '.join(map(str, [random.random() for _ in range(0, dim)]))
-            out.write(vocab[token] + '\t' + vector)
+            out.write(vocab[token] + '\t' + vector + '\n')
             offset += 1
 out.close()
-
 print ('loaded ' + str(offset) + '\t' + str(len(vocabs[0]) + len(vocabs[1])) + ' tokens to vocab')
 
 offset = 0
